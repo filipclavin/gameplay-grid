@@ -1,0 +1,18 @@
+{
+    "name": "filipclavin.gameplay-grid.Editor",
+    "rootNamespace": "GameplayGridEditor",
+    "references": [
+        "GUID:9d602607e06c4c44ab83a4faaabdc53f"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

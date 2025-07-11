@@ -1,0 +1,21 @@
+{
+  "name": "com.github.filipclavin.gameplay-grid",
+  "version": "1.0.0",
+  "displayName": "Gameplay Grid",
+  "description": "Provides tools for creating easily creating grids with custom behaviors in Unity.",
+  "documentationUrl": "https://github.com/filipclavin/GameplayGrid/wiki",
+  "changelogUrl": "https://github.com/filipclavin/GameplayGrid/releases",
+  "license": "https://spdx.org/licenses/Apache-2.0.html",
+  "dependencies": {},
+  "keywords": [
+    "gameplay",
+    "grid",
+    "pathfinding",
+    "tools"
+  ],
+  "author": {
+    "name": "Filip Clavin",
+    "email": "filipclavin99@gmail.com",
+    "url": "https://github.com/filipclavin/GameplayGrid"
+  }
+}

@@ -4,25 +4,9 @@ using UnityEngine.Assertions;
 
 namespace GameplayGrid
 {
-    public class Grid : MonoBehaviour
+    public class Grid3D : MonoBehaviour
     {
-        [SerializeField] private NodeProperties defaultNodeProperties;
-
         public List<List<List<Node>>> Nodes { get; private set; }
-
-        private void OnValidate()
-        {
-            if (defaultNodeProperties == null)
-            {
-                defaultNodeProperties = Resources.Load<NodeProperties>("DefaultNodeProperties");
-                Assert.IsNotNull(defaultNodeProperties, "DefaultNodeProperties not found in Resources.");
-            }
-
-            if (Nodes == null || Nodes.Count == 0)
-            {
-                Nodes = new() { new() { new() { new(defaultNodeProperties, Vector3Int.zero, this) } } };
-            }
-        }
 
         public void Resize(int x, int y, int z)
         {
@@ -63,10 +47,18 @@ namespace GameplayGrid
                     {
                         if (k >= Nodes[i][j].Count)
                         {
-                            Nodes[i][j].Add(new Node(defaultNodeProperties, new Vector3Int(i, j, k), this));
+                            Nodes[i][j].Add(null);
                         }
                     }
                 }
+            }
+        }
+
+        private void OnValidate()
+        {
+            if (Nodes == null || Nodes.Count == 0)
+            {
+                Nodes = new() { new() { new() { null } } };
             }
         }
     }

@@ -1,18 +1,43 @@
+using System.Collections.Generic;
+using NUnit.Framework;
 using UnityEngine;
 
 namespace GameplayGrid
 {
     public class Node
     {
-        public NodeProperties   Properties;
-        public Grid             Grid        { get; private set; }
-        public Vector3Int       Coordinates { get; private set; }
+        public Grid3D       Grid            { get; private set; }
+        public Vector3Int   Coordinates     { get; private set; }
+        public float        EntryCost;
+        public float        ExitCost;
+        public bool         IsEnabled;
+        
+        public List<Link>   Links           { get; private set; } = new();
 
-        public Node(NodeProperties properties, Vector3Int coordinates, Grid grid)
+        public Node(Grid3D grid, Vector3Int coordinates, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
         {
-            Properties = properties;
+            Assert.IsNotNull(grid, "Grid cannot be null.");
+
+            Grid        = grid;
             Coordinates = coordinates;
-            Grid = grid;
+            EntryCost   = entryCost;
+            ExitCost    = exitCost;
+            IsEnabled   = isEnabled;
+        }
+
+        ~Node()
+        {
+            foreach (var link in Links)
+            {
+                if (link.FromNode == this)
+                {
+                    link.ToNode.Links.Remove(link);
+                }
+                else if (link.ToNode == this)
+                {
+                    link.FromNode.Links.Remove(link);
+                }
+            }
         }
 
         public Vector3 GetWorldPosition()
@@ -20,7 +45,7 @@ namespace GameplayGrid
             return Grid.transform.TransformPoint(Coordinates);
         }
 
-        protected virtual void OnEnter() { }
-        protected virtual void OnExit() { }
+        public virtual void OnEnter(GameObject agent, Link fromLink) { }
+        public virtual void OnExit(GameObject agent, Link toLink) { }
     }
 }

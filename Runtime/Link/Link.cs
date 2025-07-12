@@ -1,21 +1,24 @@
+using NUnit.Framework;
 using UnityEngine;
 
 namespace GameplayGrid
 {
     public class Link
     {
-        public LinkProperties Properties;
+        public Node     FromNode    { get; private set; }
+        public Node     ToNode      { get; private set; }
+        public float    Cost        { get; private set; }
 
-        public Node FromNode    { get; private set; }
-        public Node ToNode      { get; private set; }
-
-        public Link(LinkProperties properties, Node fromNode, Node toNode)
+        public Link(Node fromNode, Node toNode, float cost = 1f)
         {
-            Properties = properties;
-            FromNode = fromNode;
-            ToNode = toNode;
+            Assert.IsNotNull(fromNode, "FromNode cannot be null.");
+            Assert.IsNotNull(toNode, "ToNode cannot be null.");
+
+            FromNode    = fromNode;
+            ToNode      = toNode;
+            Cost        = cost;
         }
 
-        protected virtual void OnEnter() { }
+        public virtual void OnUse(GameObject agent) {}
     }
 }

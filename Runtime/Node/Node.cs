@@ -42,7 +42,7 @@ namespace GameplayGrid
 
         public Vector3 GetWorldPosition()
         {
-            return Grid.transform.TransformPoint(Coordinates);
+            return Grid.CoordinateToWorldPosition(Coordinates);
         }
 
         public virtual void OnEnter(GameObject agent, Link fromLink) { }

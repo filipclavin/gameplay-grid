@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "displayName": "Gameplay Grid",
   "description": "Provides tools for creating easily creating grids with custom behaviors in Unity.",
+  "unity": "2021.1",
   "documentationUrl": "https://github.com/filipclavin/GameplayGrid/wiki",
   "changelogUrl": "https://github.com/filipclavin/GameplayGrid/releases",
   "license": "https://spdx.org/licenses/Apache-2.0.html",

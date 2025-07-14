@@ -10,18 +10,19 @@ namespace GameplayGridEditor
     [EditorTool("Grid3D Editor Tool", typeof(Grid3D))]
     public class Grid3DEditorTool : EditorTool
     {
-        private static readonly float s_cellHandleSize  = .2f;
+        private static readonly float s_cellHandleSize = .2f;
         private static readonly Color s_cellHandleColor = new(1f, 1f, 1f, .2f);
+        private static readonly Color s_cellHandleColorSelected = new(.6f, .75f, 1f, .5f);
 
-        private static readonly Color s_selectionRectangleColor         = new(.5f, .55f, .65f, 0.15f);
-        private static readonly Color s_selectionRectangleOutlineColor  = new(.5f, .55f, .65f, .75f);
+        private static readonly Color s_selectionRectangleColor = new(.5f, .55f, .65f, 0.15f);
+        private static readonly Color s_selectionRectangleOutlineColor = new(.5f, .55f, .65f, .75f);
 
         private static readonly float s_minimumDragDistance = 5f;
 
         private Grid3D _grid;
 
-        private HashSet<Vector3Int> _selectedCells      = new();
-        private Vector3Int          _lastSelectedCell   = -Vector3Int.one;
+        private HashSet<Vector3Int> _selectedCells = new();
+        private Vector3Int _lastSelectedCell = -Vector3Int.one;
 
         private HashSet<int> _hiddenX = new();
         private HashSet<int> _hiddenY = new();
@@ -48,7 +49,7 @@ namespace GameplayGridEditor
         public override void OnToolGUI(EditorWindow window)
         {
             _event = Event.current;
-            
+
             bool isEventUsed = HandleDrag();
 
             SceneView sceneView = window as SceneView;
@@ -67,19 +68,13 @@ namespace GameplayGridEditor
 
                         Vector3Int cell = new(x, y, z);
                         Vector3 center = _grid.CoordinatesToWorldPosition(cell);
-                        if (!IsPointVisible(center, sceneView)) continue;
+                        if (!IsWorldPointVisible(center, sceneView)) continue;
 
                         bool isSelected = _selectedCells.Contains(cell);
 
                         int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                        Handles.color = s_cellHandleColor;
+                        Handles.color = isSelected ? s_cellHandleColorSelected : s_cellHandleColor;
                         Handles.SphereHandleCap(controlID, center, _grid.transform.rotation, s_cellHandleSize, Event.current.type);
-
-                        if (isSelected)
-                        {
-                            Handles.color = Color.orange;
-                            Handles.DrawWireCube(center, Vector3.one * s_cellHandleSize);
-                        }
 
                         if (!isEventUsed)
                         {
@@ -134,8 +129,9 @@ namespace GameplayGridEditor
                                 if (_hiddenZ.Contains(z)) continue;
 
                                 Vector3Int cell = new(x, y, z);
+                                Vector3 center = _grid.CoordinatesToWorldPosition(cell);
 
-                                Vector2 cellGUIPoint = HandleUtility.WorldToGUIPoint(_grid.CoordinatesToWorldPosition(cell));
+                                Vector2 cellGUIPoint = HandleUtility.WorldToGUIPoint(center);
 
                                 if (_selectionRect.Contains(cellGUIPoint))
                                     newSelection.Add(cell);
@@ -156,7 +152,7 @@ namespace GameplayGridEditor
                         _selectedCells = newSelection;
                     }
 
-                        _event.Use();
+                    _event.Use();
                     return true;
                 case EventType.MouseUp:
                     if (_isDragging)
@@ -245,7 +241,7 @@ namespace GameplayGridEditor
             return true;
         }
 
-        private static bool IsPointVisible(Vector3 worldPos, SceneView sceneView)
+        private static bool IsWorldPointVisible(Vector3 worldPos, SceneView sceneView)
         {
             Vector3 viewportPoint = sceneView.camera.WorldToViewportPoint(worldPos);
             return viewportPoint.z > 0 &&

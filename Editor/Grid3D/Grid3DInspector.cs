@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 using GameplayGrid;
+using UnityEditor.EditorTools;
 
 namespace GameplayGridEditor
 {
@@ -18,6 +19,13 @@ namespace GameplayGridEditor
             VisualElement root = new();
 
             InspectorElement.FillDefaultInspector(root, serializedObject, this);
+
+            Button openEditorButton = new() { text = "Edit Grid" };
+            openEditorButton.clicked += () =>
+            {
+                ToolManager.SetActiveTool<Grid3DEditorTool>();
+            };
+            root.Add(openEditorButton);
 
             return root;
         }

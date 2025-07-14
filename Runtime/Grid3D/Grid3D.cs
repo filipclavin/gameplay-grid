@@ -61,7 +61,7 @@ namespace GameplayGrid
             }
         }
 
-        public Vector3 CoordinateToWorldPosition(Vector3Int coordinates)
+        public Vector3 CoordinatesToWorldPosition(Vector3Int coordinates)
         {
             return transform.TransformPoint(coordinates + new Vector3(.5f, .5f, .5f));
         }
@@ -82,7 +82,7 @@ namespace GameplayGrid
                         if (node != null)
                         {
                             Gizmos.color = node.IsEnabled ? Color.green : Color.red;
-                            Gizmos.DrawWireCube(node.Coordinates, transform.localScale);
+                            Gizmos.DrawWireCube(node.Cell, transform.localScale);
                         }
                     }
                 }

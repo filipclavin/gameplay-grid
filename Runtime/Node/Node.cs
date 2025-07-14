@@ -7,19 +7,19 @@ namespace GameplayGrid
     public class Node
     {
         public Grid3D       Grid            { get; private set; }
-        public Vector3Int   Coordinates     { get; private set; }
+        public Vector3Int   Cell     { get; private set; }
         public float        EntryCost;
         public float        ExitCost;
         public bool         IsEnabled;
         
         public List<Link>   Links           { get; private set; } = new();
 
-        public Node(Grid3D grid, Vector3Int coordinates, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
+        public Node(Grid3D grid, Vector3Int cell, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
         {
             Assert.IsNotNull(grid, "Grid cannot be null.");
 
             Grid        = grid;
-            Coordinates = coordinates;
+            Cell        = cell;
             EntryCost   = entryCost;
             ExitCost    = exitCost;
             IsEnabled   = isEnabled;
@@ -42,7 +42,7 @@ namespace GameplayGrid
 
         public Vector3 GetWorldPosition()
         {
-            return Grid.CoordinateToWorldPosition(Coordinates);
+            return Grid.CoordinatesToWorldPosition(Cell);
         }
 
         public virtual void OnEnter(GameObject agent, Link fromLink) { }

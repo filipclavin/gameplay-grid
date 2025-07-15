@@ -23,7 +23,7 @@ namespace GameplayGridEditor
             Button openEditorButton = new() { text = "Edit Grid" };
             openEditorButton.clicked += () =>
             {
-                ToolManager.SetActiveTool<Grid3DEditorTool>();
+                ToolManager.SetActiveTool<Grid3DTool>();
             };
             root.Add(openEditorButton);
 

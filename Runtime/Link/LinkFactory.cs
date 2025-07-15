@@ -7,7 +7,7 @@ namespace GameplayGrid
     {
         public virtual Link CreateLink(Node fromNode, Node toNode)
         {
-            return new Link(fromNode, toNode);
+            return new Link(this, fromNode, toNode);
         }
     }
 }

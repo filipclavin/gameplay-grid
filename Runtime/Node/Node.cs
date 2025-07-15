@@ -1,23 +1,29 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
 namespace GameplayGrid
 {
+    [Serializable]
     public class Node
     {
-        public Grid3D       Grid            { get; private set; }
-        public Vector3Int   Cell     { get; private set; }
-        public float        EntryCost;
-        public float        ExitCost;
-        public bool         IsEnabled;
-        
-        public List<Link>   Links           { get; private set; } = new();
+        [field: SerializeField] public NodeFactory  NodeFactory { get; private set; }
+        [field: SerializeField] public Grid3D       Grid { get; private set; }
+        [field: SerializeField] public Vector3Int   Cell { get; private set; }
 
-        public Node(Grid3D grid, Vector3Int cell, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
+        [SerializeField] public float   EntryCost;
+        [SerializeField] public float   ExitCost;
+        [SerializeField] public bool    IsEnabled;
+        
+        [field: SerializeField] public List<Link> Links { get; private set; } = new();
+
+        public Node(NodeFactory nodeFactory, Grid3D grid, Vector3Int cell, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
         {
+            Assert.IsNotNull(nodeFactory, "NodeFactory cannot be null.");
             Assert.IsNotNull(grid, "Grid cannot be null.");
 
+            NodeFactory = nodeFactory;
             Grid        = grid;
             Cell        = cell;
             EntryCost   = entryCost;
@@ -42,7 +48,7 @@ namespace GameplayGrid
 
         public Vector3 GetWorldPosition()
         {
-            return Grid.CoordinatesToWorldPosition(Cell);
+            return Grid.CellToWorldPosition(Cell);
         }
 
         public virtual void OnEnter(GameObject agent, Link fromLink) { }

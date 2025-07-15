@@ -5,9 +5,9 @@ namespace GameplayGrid
     [CreateAssetMenu(fileName = "NodeFactory", menuName = "Scriptable Objects/NodeFactory")]
     public class NodeFactory : ScriptableObject
     {
-        public virtual Node CreateNode(Vector3Int coordinates, Grid3D grid)
+        public virtual Node CreateNode(Grid3D grid, Vector3Int cell)
         {
-            return new Node(grid, coordinates);
+            return new Node(this, grid, cell);
         }
     }
 }

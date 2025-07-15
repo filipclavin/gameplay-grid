@@ -1,14 +1,17 @@
-using UnityEditor.EditorTools;
-using UnityEngine;
 using GameplayGrid;
 using System.Collections.Generic;
-using UnityEditor.ShortcutManagement;
 using UnityEditor;
+using UnityEditor.EditorTools;
+using UnityEditor.Overlays;
+using UnityEditor.ShortcutManagement;
+using UnityEditor.UIElements;
+using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace GameplayGridEditor
 {
     [EditorTool("Grid3D Editor Tool", typeof(Grid3D))]
-    public class Grid3DEditorTool : EditorTool
+    public class Grid3DTool : EditorTool
     {
         private static readonly float s_cellHandleSize = .2f;
         private static readonly Color s_cellHandleColor = new(1f, 1f, 1f, .2f);
@@ -34,16 +37,108 @@ namespace GameplayGridEditor
         private bool _isDragging;
         private Rect _selectionRect = new();
 
-        [Shortcut("Activate Grid3D Editor Tool", null, KeyCode.G, ShortcutModifiers.Control)]
-        private static void Grid3DEditorToolShortcut()
+        private SceneView _sceneView;
+
+        [Overlay(defaultDisplay = true)]
+        class Grid3DToolOverlay : Overlay
         {
-            if (Selection.GetFiltered<Grid3D>(SelectionMode.TopLevel).Length > 0)
-                ToolManager.SetActiveTool<Grid3DEditorTool>();
+            private Grid3DTool          _tool;
+            private Grid3D              _grid;
+
+            public Grid3DToolOverlay(Grid3DTool tool)
+            {
+                _tool = tool;
+                _grid = tool._grid;
+            }
+
+            public override VisualElement CreatePanelContent()
+            {
+                Debug.Log($"Creating panel content for Grid3DToolOverlay with {_tool._selectedCells.Count} selected cells.");
+                VisualElement root = new();
+
+                if (_tool._selectedCells.Count == 0)
+                {
+                    return root;
+                }
+
+                Vector3Int someSelectedCell = -Vector3Int.one;
+                foreach (var cell in _tool._selectedCells)
+                {
+                    someSelectedCell = cell;
+                    break;
+                }
+                Node someSelectedNode = _grid.TryGetNode(someSelectedCell);
+
+                bool nodeFactoriesMixed = false;
+                foreach (var cell in _tool._selectedCells)
+                {
+                    if (nodeFactoriesMixed) break;
+
+                    Node node = _grid.TryGetNode(cell);
+
+                    if (node == null)
+                    {
+                        if (someSelectedNode == null)
+                            continue;
+                        else
+                        {
+                            nodeFactoriesMixed = true;
+                            break;
+                        }
+                    }
+
+                    if (someSelectedNode == null)
+                    {
+                        nodeFactoriesMixed = true;
+                        break;
+                    }
+
+                    if (node.NodeFactory != someSelectedNode.NodeFactory)
+                    {
+                        nodeFactoriesMixed = true;
+                    }
+                }
+
+                ObjectField nodeFactoryField = new("Node Factory")
+                {
+                    value           = _grid.TryGetNode(someSelectedCell)?.NodeFactory,
+                    objectType      = typeof(NodeFactory),
+                    showMixedValue  = nodeFactoriesMixed
+                };
+
+                // Set up the callback for when the node factory is changed
+                nodeFactoryField.RegisterValueChangedCallback(evt =>
+                {
+                    NodeFactory newFactory = evt.newValue as NodeFactory;
+                    Debug.Log($"Node Factory changed to: {newFactory?.name}");
+
+                    foreach (var cell in _tool._selectedCells)
+                    {
+                        if (newFactory == null)
+                            _grid.NodeMatrix[cell.x][cell.y][cell.z] = null;
+                        else
+                            _grid.NodeMatrix[cell.x][cell.y][cell.z] = newFactory.CreateNode(_grid, cell);
+                    }
+                });
+
+                root.Add(nodeFactoryField);
+
+                return root;
+            }
         }
+
+        private Grid3DToolOverlay _overlay;
 
         public override void OnActivated()
         {
             _grid = target as Grid3D;
+            _sceneView = SceneView.lastActiveSceneView;
+            SceneView.AddOverlayToActiveView(_overlay = new(this));
+        }
+
+        public override void OnWillBeDeactivated()
+        {
+            SceneView.RemoveOverlayFromActiveView(_overlay);
         }
 
         public override void OnToolGUI(EditorWindow window)
@@ -51,9 +146,6 @@ namespace GameplayGridEditor
             _event = Event.current;
 
             bool isEventUsed = HandleDrag();
-
-            SceneView sceneView = window as SceneView;
-            if (sceneView == null) return;
 
             bool wasAnyCellClicked = false;
             for (int x = 0; x < _grid.Dimensions.x; x++)
@@ -67,8 +159,8 @@ namespace GameplayGridEditor
                         if (_hiddenZ.Contains(z)) continue;
 
                         Vector3Int cell = new(x, y, z);
-                        Vector3 center = _grid.CoordinatesToWorldPosition(cell);
-                        if (!IsWorldPointVisible(center, sceneView)) continue;
+                        Vector3 center = _grid.CellToWorldPosition(cell);
+                        if (!IsWorldPointVisible(center, _sceneView)) continue;
 
                         bool isSelected = _selectedCells.Contains(cell);
 
@@ -90,7 +182,7 @@ namespace GameplayGridEditor
 
             if (!isEventUsed && _event.type == EventType.MouseUp && _event.button == 0 && !wasAnyCellClicked && _selectedCells.Count > 0)
             {
-                _selectedCells.Clear();
+                ClearSelectedCells();
                 _event.Use();
             }
         }
@@ -117,7 +209,7 @@ namespace GameplayGridEditor
                         Mathf.Abs(_mouseDownPosition.x - _event.mousePosition.x),
                         Mathf.Abs(_mouseDownPosition.y - _event.mousePosition.y));
 
-                    HashSet<Vector3Int> newSelection = new();
+                    List<Vector3Int> newSelection = new();
                     for (int x = 0; x < _grid.Dimensions.x; x++)
                     {
                         if (_hiddenX.Contains(x)) continue;
@@ -129,7 +221,7 @@ namespace GameplayGridEditor
                                 if (_hiddenZ.Contains(z)) continue;
 
                                 Vector3Int cell = new(x, y, z);
-                                Vector3 center = _grid.CoordinatesToWorldPosition(cell);
+                                Vector3 center = _grid.CellToWorldPosition(cell);
 
                                 Vector2 cellGUIPoint = HandleUtility.WorldToGUIPoint(center);
 
@@ -141,16 +233,11 @@ namespace GameplayGridEditor
 
                     if (_event.control)
                     {
-                        foreach (var selectedCell in newSelection)
-                        {
-                            if (!_selectedCells.Contains(selectedCell))
-                                _selectedCells.Add(selectedCell);
-                        }
+                        if (newSelection.Count > 0)
+                            SelectCells(newSelection, false);
                     }
                     else
-                    {
-                        _selectedCells = newSelection;
-                    }
+                        SelectCells(newSelection, true);
 
                     _event.Use();
                     return true;
@@ -184,18 +271,18 @@ namespace GameplayGridEditor
                 Vector3Int min = Vector3Int.Min(lastSelected, cell);
                 Vector3Int max = Vector3Int.Max(lastSelected, cell);
 
+                List<Vector3Int> newSelection = new();
                 for (int x = min.x; x <= max.x; x++)
                 {
                     for (int y = min.y; y <= max.y; y++)
                     {
                         for (int z = min.z; z <= max.z; z++)
                         {
-                            Vector3Int c = new(x, y, z);
-                            if (!_selectedCells.Contains(c))
-                                _selectedCells.Add(c);
+                            newSelection.Add(new(x, y, z));
                         }
                     }
                 }
+                SelectCells(newSelection, false);
             }
             else if (_event.shift)
             {
@@ -211,34 +298,93 @@ namespace GameplayGridEditor
                 Vector3Int min = Vector3Int.Min(furthestSelected, cell);
                 Vector3Int max = Vector3Int.Max(furthestSelected, cell);
 
+                List<Vector3Int> newSelection = new();
                 for (int x = min.x; x <= max.x; x++)
                 {
                     for (int y = min.y; y <= max.y; y++)
                     {
                         for (int z = min.z; z <= max.z; z++)
                         {
-                            Vector3Int c = new(x, y, z);
-                            if (!_selectedCells.Contains(c))
-                                _selectedCells.Add(c);
+                            newSelection.Add(new(x, y, z));
                         }
                     }
                 }
+                SelectCells(newSelection, true);
             }
             else if (_event.control)
             {
-                if (_selectedCells.Contains(cell))
-                    _selectedCells.Remove(cell);
-                else
-                    _selectedCells.Add(cell);
+                ToggleCell(cell);
             }
             else
             {
-                _selectedCells.Clear();
-                _selectedCells.Add(cell);
+                SelectCell(cell, true);
             }
 
             _event.Use();
             return true;
+        }
+
+        private void OnCellSelectionUpdated()
+        {
+            _overlay.displayed = false;
+            _overlay.displayed = true;
+        }
+
+        private void SelectCell(Vector3Int cell, bool clearPreviousSelection)
+        {
+            if (clearPreviousSelection)
+            {
+                _selectedCells.Clear();
+            }
+
+            if (!_selectedCells.Contains(cell))
+            {
+                _selectedCells.Add(cell);
+            }
+
+            _lastSelectedCell = cell;
+            OnCellSelectionUpdated();
+        }
+
+        private void SelectCells(List<Vector3Int> cells, bool clearPreviousSelection)
+        {
+            if (clearPreviousSelection)
+            {
+                _selectedCells.Clear();
+            }
+
+            foreach (var cell in cells)
+            {
+                if (!_selectedCells.Contains(cell))
+                {
+                    _selectedCells.Add(cell);
+                }
+            }
+
+            _lastSelectedCell = cells.Count > 0 ? cells[^1] : -Vector3Int.one;
+            OnCellSelectionUpdated();
+        }
+
+        private void ToggleCell(Vector3Int cell)
+        {
+            if (_selectedCells.Contains(cell))
+            {
+                _selectedCells.Remove(cell);
+            }
+            else
+            {
+                _selectedCells.Add(cell);
+                _lastSelectedCell = cell;
+            }
+
+            OnCellSelectionUpdated();
+        }
+
+        private void ClearSelectedCells()
+        {
+            _selectedCells.Clear();
+            _lastSelectedCell = -Vector3Int.one;
+            OnCellSelectionUpdated();
         }
 
         private static bool IsWorldPointVisible(Vector3 worldPos, SceneView sceneView)
@@ -247,6 +393,13 @@ namespace GameplayGridEditor
             return viewportPoint.z > 0 &&
                    viewportPoint.x >= 0 && viewportPoint.x <= 1 &&
                    viewportPoint.y >= 0 && viewportPoint.y <= 1;
+        }
+
+        [Shortcut("Activate Grid3D Editor Tool", null, KeyCode.G, ShortcutModifiers.Control)]
+        private static void Grid3DEditorToolShortcut()
+        {
+            if (Selection.GetFiltered<Grid3D>(SelectionMode.TopLevel).Length > 0)
+                ToolManager.SetActiveTool<Grid3DTool>();
         }
     }
 }

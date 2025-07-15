@@ -8,7 +8,9 @@ namespace GameplayGrid
     {
         [field: SerializeField, Min(1)] public Vector3Int Dimensions { get; private set; } = new(1, 1, 1);
 
-        public List<List<List<Node>>> NodeMatrix { get; private set; } = new() { new() { new() { null } } };
+        [field: SerializeField] public List<List<List<Node>>> NodeMatrix { get; private set; } = new() { new() { new() { null } } };
+
+        private static Vector3 cellOffset = new(0.5f, 0.5f, 0.5f);
 
         public void SetDimensions(Vector3Int dimensions)
         {
@@ -61,9 +63,20 @@ namespace GameplayGrid
             }
         }
 
-        public Vector3 CoordinatesToWorldPosition(Vector3Int coordinates)
+        public Vector3 CellToWorldPosition(Vector3Int cell)
         {
-            return transform.TransformPoint(coordinates + new Vector3(.5f, .5f, .5f));
+            return transform.TransformPoint(cell + cellOffset);
+        }
+
+        public Node TryGetNode(Vector3Int cell)
+        {
+            if (cell.x < 0 || cell.y < 0 || cell.z < 0 ||
+                cell.x >= NodeMatrix.Count || cell.y >= NodeMatrix[cell.x].Count ||
+                cell.z >= NodeMatrix[cell.x][cell.y].Count)
+            {
+                return null;
+            }
+            return NodeMatrix[cell.x][cell.y][cell.z];
         }
 
         private void OnDrawGizmos()
@@ -82,7 +95,7 @@ namespace GameplayGrid
                         if (node != null)
                         {
                             Gizmos.color = node.IsEnabled ? Color.green : Color.red;
-                            Gizmos.DrawWireCube(node.Cell, transform.localScale);
+                            Gizmos.DrawWireCube(node.Cell + cellOffset, transform.localScale);
                         }
                     }
                 }

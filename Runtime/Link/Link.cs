@@ -1,19 +1,24 @@
 using NUnit.Framework;
+using System;
 using UnityEngine;
 
 namespace GameplayGrid
 {
+    [Serializable]
     public class Link
     {
-        public Node     FromNode    { get; private set; }
-        public Node     ToNode      { get; private set; }
-        public float    Cost        { get; private set; }
+        [field: SerializeField] public LinkFactory  LinkFactory { get; private set; }
+        [field: SerializeField] public Node         FromNode    { get; private set; }
+        [field: SerializeField] public Node         ToNode      { get; private set; }
+        [field: SerializeField] public float        Cost        { get; private set; }
 
-        public Link(Node fromNode, Node toNode, float cost = 1f)
+        public Link(LinkFactory linkFactory, Node fromNode, Node toNode, float cost = 1f)
         {
+            Assert.IsNotNull(linkFactory, "LinkFactory cannot be null.");
             Assert.IsNotNull(fromNode, "FromNode cannot be null.");
             Assert.IsNotNull(toNode, "ToNode cannot be null.");
 
+            LinkFactory = linkFactory;
             FromNode    = fromNode;
             ToNode      = toNode;
             Cost        = cost;

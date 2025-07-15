@@ -16,7 +16,7 @@ namespace GameplayGrid
         [SerializeField] public float   ExitCost;
         [SerializeField] public bool    IsEnabled;
         
-        [field: SerializeField] public List<Link> Links { get; private set; } = new();
+        [field: SerializeReference] public List<Link> Links { get; private set; } = new();
 
         public Node(NodeFactory nodeFactory, Grid3D grid, Vector3Int cell, float entryCost = 0f, float exitCost = 0f, bool isEnabled = true)
         {

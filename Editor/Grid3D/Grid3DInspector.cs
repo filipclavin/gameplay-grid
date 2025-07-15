@@ -18,7 +18,20 @@ namespace GameplayGridEditor
 
             VisualElement root = new();
 
-            InspectorElement.FillDefaultInspector(root, serializedObject, this);
+            Vector3IntField dimensionsField = new("Dimensions")
+            {
+                value = _grid.Dimensions,
+            };
+            dimensionsField.RegisterValueChangedCallback(evt =>
+            {
+                Vector3Int clampedValue = Vector3Int.Max(evt.newValue, Vector3Int.one);
+                dimensionsField.value = clampedValue;
+
+                _grid.SetDimensions(clampedValue);
+                EditorUtility.SetDirty(_grid);
+            });
+            dimensionsField.AddToClassList("unity-base-field__aligned");
+            root.Add(dimensionsField);
 
             Button openEditorButton = new() { text = "Edit Grid" };
             openEditorButton.clicked += () =>

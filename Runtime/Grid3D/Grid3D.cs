@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Dynamic;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -8,59 +9,41 @@ namespace GameplayGrid
     {
         [field: SerializeField, Min(1)] public Vector3Int Dimensions { get; private set; } = new(1, 1, 1);
 
-        [field: SerializeField] public List<List<List<Node>>> NodeMatrix { get; private set; } = new() { new() { new() { null } } };
+        [SerializeReference] private List<Node> _nodeMatrix = new() { null };
 
         private static Vector3 cellOffset = new(0.5f, 0.5f, 0.5f);
 
-        public void SetDimensions(Vector3Int dimensions)
-        {
-            SetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        }
-
         public void SetDimensions(int x, int y, int z)
         {
-            Assert.IsTrue(x > 0 && y > 0 && z > 0, "Grid dimensions must be greater than zero.");
+            SetDimensions(new Vector3Int(x, y, z));
+        }
 
-            if (x < NodeMatrix.Count)
+        public void SetDimensions(Vector3Int newDimensions)
+        {
+            Assert.IsTrue(newDimensions.x > 0 && newDimensions.y > 0 && newDimensions.z > 0, "Grid dimensions must be greater than zero.");
+
+            List<Node> newNodeMatrix = new(newDimensions.x * newDimensions.y * newDimensions.z);
+            for (int i = 0; i < newDimensions.x * newDimensions.y * newDimensions.z; i++)
             {
-                NodeMatrix.RemoveRange(x, NodeMatrix.Count - x);
+                newNodeMatrix.Add(null);
             }
 
-            for (int i = 0; i < x; i++)
+            Vector3Int min = Vector3Int.Min(Dimensions, newDimensions);
+
+            for (int z = 0; z < min.z; z++)
             {
-                if (i >= NodeMatrix.Count)
+                for (int y = 0; y < min.y; y++)
                 {
-                    NodeMatrix.Add(new List<List<Node>>());
-                }
-
-                if (y < NodeMatrix[i].Count)
-                {
-                    NodeMatrix[i].RemoveRange(y, NodeMatrix[i].Count - y);
-                    break;
-                }
-
-                for (int j = 0; j < y; j++)
-                {
-                    if (j >= NodeMatrix[i].Count)
+                    for (int x = 0; x < min.x; x++)
                     {
-                        NodeMatrix[i].Add(new List<Node>());
-                    }
-
-                    if (z < NodeMatrix[i][j].Count)
-                    {
-                        NodeMatrix[i][j].RemoveRange(z, NodeMatrix[i][j].Count - z);
-                        continue;
-                    }
-
-                    for (int k = 0; k < z; k++)
-                    {
-                        if (k >= NodeMatrix[i][j].Count)
-                        {
-                            NodeMatrix[i][j].Add(null);
-                        }
+                        int newIndex = x + newDimensions.x * (y + newDimensions.y * z);
+                        newNodeMatrix[newIndex] = TryGetNode(x, y, z);
                     }
                 }
             }
+
+            Dimensions = newDimensions;
+            _nodeMatrix = newNodeMatrix;
         }
 
         public Vector3 CellToWorldPosition(Vector3Int cell)
@@ -68,15 +51,40 @@ namespace GameplayGrid
             return transform.TransformPoint(cell + cellOffset);
         }
 
+        public int TryGetNodeIndex(Vector3Int cell)
+        {
+            return TryGetNodeIndex(cell.x, cell.y, cell.z);
+        }
+        public int TryGetNodeIndex(int x, int y, int z)
+        {
+            if (x < 0 || y < 0 || z < 0 || x >= Dimensions.x || y >= Dimensions.y || z >= Dimensions.z) return -1;
+
+            return x + Dimensions.x * (y + Dimensions.y * z);
+        }
+
         public Node TryGetNode(Vector3Int cell)
         {
-            if (cell.x < 0 || cell.y < 0 || cell.z < 0 ||
-                cell.x >= NodeMatrix.Count || cell.y >= NodeMatrix[cell.x].Count ||
-                cell.z >= NodeMatrix[cell.x][cell.y].Count)
-            {
-                return null;
-            }
-            return NodeMatrix[cell.x][cell.y][cell.z];
+            return TryGetNode(cell.x, cell.y, cell.z);
+        }
+        public Node TryGetNode(int x, int y, int z)
+        {
+            int index = TryGetNodeIndex(x, y, z);
+            if (index == -1 || index >= _nodeMatrix.Count) return null;
+
+            return _nodeMatrix[index];
+        }
+
+        public bool TrySetNode(Vector3Int cell, Node node)
+        {
+            return TrySetNode(cell.x, cell.y, cell.z, node);
+        }
+        public bool TrySetNode(int x, int y, int z, Node node)
+        {
+            int index = TryGetNodeIndex(x, y, z);
+            if (index == -1 || index >= _nodeMatrix.Count) return false;
+
+            _nodeMatrix[index] = node;
+            return true;
         }
 
         private void OnDrawGizmos()
@@ -86,19 +94,12 @@ namespace GameplayGrid
             Gizmos.color = Color.white;
             Gizmos.DrawWireCube((Vector3)Dimensions / 2f, Dimensions);
 
-            foreach (var x in NodeMatrix)
+            foreach (Node node in _nodeMatrix)
             {
-                foreach (var y in x)
-                {
-                    foreach (var node in y)
-                    {
-                        if (node != null)
-                        {
-                            Gizmos.color = node.IsEnabled ? Color.green : Color.red;
-                            Gizmos.DrawWireCube(node.Cell + cellOffset, transform.localScale);
-                        }
-                    }
-                }
+                if (node == null) continue;
+
+                Gizmos.color = node.IsEnabled ? Color.green : Color.red;
+                Gizmos.DrawWireCube(node.Cell + cellOffset, transform.localScale);
             }
         }
     }

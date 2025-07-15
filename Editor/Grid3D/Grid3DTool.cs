@@ -15,7 +15,9 @@ namespace GameplayGridEditor
     {
         private static readonly float s_cellHandleSize = .2f;
         private static readonly Color s_cellHandleColor = new(1f, 1f, 1f, .2f);
-        private static readonly Color s_cellHandleColorSelected = new(.6f, .75f, 1f, .5f);
+        private static readonly Color s_cellHandleColorEnabled = new(0f, 1f, 0f, .4f);
+        private static readonly Color s_cellHandleColorDisabled = new(1f, 0f, 0f, .4f);
+        private static readonly Color s_cellHandleColorSelected = new(.6f, .8f, 1f, .4f);
 
         private static readonly Color s_selectionRectangleColor = new(.5f, .55f, .65f, 0.15f);
         private static readonly Color s_selectionRectangleOutlineColor = new(.5f, .55f, .65f, .75f);
@@ -53,7 +55,6 @@ namespace GameplayGridEditor
 
             public override VisualElement CreatePanelContent()
             {
-                Debug.Log($"Creating panel content for Grid3DToolOverlay with {_tool._selectedCells.Count} selected cells.");
                 VisualElement root = new();
 
                 if (_tool._selectedCells.Count == 0)
@@ -101,7 +102,7 @@ namespace GameplayGridEditor
 
                 ObjectField nodeFactoryField = new("Node Factory")
                 {
-                    value           = _grid.TryGetNode(someSelectedCell)?.NodeFactory,
+                    value           = nodeFactoriesMixed ? null : _grid.TryGetNode(someSelectedCell)?.NodeFactory,
                     objectType      = typeof(NodeFactory),
                     showMixedValue  = nodeFactoriesMixed
                 };
@@ -110,15 +111,16 @@ namespace GameplayGridEditor
                 nodeFactoryField.RegisterValueChangedCallback(evt =>
                 {
                     NodeFactory newFactory = evt.newValue as NodeFactory;
-                    Debug.Log($"Node Factory changed to: {newFactory?.name}");
 
                     foreach (var cell in _tool._selectedCells)
                     {
                         if (newFactory == null)
-                            _grid.NodeMatrix[cell.x][cell.y][cell.z] = null;
+                            _grid.TrySetNode(cell, null);
                         else
-                            _grid.NodeMatrix[cell.x][cell.y][cell.z] = newFactory.CreateNode(_grid, cell);
+                            _grid.TrySetNode(cell, newFactory.CreateNode(_grid, cell));
                     }
+
+                    EditorUtility.SetDirty(_grid);
                 });
 
                 root.Add(nodeFactoryField);
@@ -162,10 +164,9 @@ namespace GameplayGridEditor
                         Vector3 center = _grid.CellToWorldPosition(cell);
                         if (!IsWorldPointVisible(center, _sceneView)) continue;
 
-                        bool isSelected = _selectedCells.Contains(cell);
-
                         int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                        Handles.color = isSelected ? s_cellHandleColorSelected : s_cellHandleColor;
+
+                        Handles.color = GetCellHandleColor(cell);
                         Handles.SphereHandleCap(controlID, center, _grid.transform.rotation, s_cellHandleSize, Event.current.type);
 
                         if (!isEventUsed)
@@ -393,6 +394,20 @@ namespace GameplayGridEditor
             return viewportPoint.z > 0 &&
                    viewportPoint.x >= 0 && viewportPoint.x <= 1 &&
                    viewportPoint.y >= 0 && viewportPoint.y <= 1;
+        }
+
+        private Color GetCellHandleColor(Vector3Int cell)
+        {
+            Node node = _grid.TryGetNode(cell);
+
+            if (_selectedCells.Contains(cell))
+                return s_cellHandleColorSelected;
+            else if (node == null)
+                return s_cellHandleColor;
+            else if (node.IsEnabled)
+                return s_cellHandleColorEnabled;
+            else
+                return s_cellHandleColorDisabled;
         }
 
         [Shortcut("Activate Grid3D Editor Tool", null, KeyCode.G, ShortcutModifiers.Control)]

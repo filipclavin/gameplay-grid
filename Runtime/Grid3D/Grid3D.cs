@@ -5,13 +5,18 @@ using UnityEngine.Assertions;
 
 namespace GameplayGrid
 {
-    public class Grid3D : MonoBehaviour
+    public class Grid3D : MonoBehaviour, ISerializationCallbackReceiver
     {
         [field: SerializeField, Min(1)] public Vector3Int Dimensions { get; private set; } = new(1, 1, 1);
 
         [SerializeReference] private List<Node> _nodeMatrix = new() { null };
 
         private static Vector3 cellOffset = new(0.5f, 0.5f, 0.5f);
+
+#if UNITY_EDITOR
+        public HashSet<Vector3Int> HiddenCells = new();
+        [SerializeField] private List<Vector3Int> _serializableHiddenCells = new();
+#endif
 
         public void SetDimensions(int x, int y, int z)
         {
@@ -94,13 +99,38 @@ namespace GameplayGrid
             Gizmos.color = Color.white;
             Gizmos.DrawWireCube((Vector3)Dimensions / 2f, Dimensions);
 
-            foreach (Node node in _nodeMatrix)
+            for (int x = 0; x < Dimensions.x; x++)
             {
-                if (node == null) continue;
+                for (int y = 0; y < Dimensions.y; y++)
+                {
+                    for (int z = 0; z < Dimensions.z; z++)
+                    {
+                        if (HiddenCells.Contains(new Vector3Int(x, y, z))) continue;
 
-                Gizmos.color = node.IsEnabled ? Color.green : Color.red;
-                Gizmos.DrawWireCube(node.Cell + cellOffset, transform.localScale);
+                        Node node = TryGetNode(x, y, z);
+                        if (node != null)
+                        {
+                            Gizmos.color = Color.green;
+                            Vector3Int cell = new(x, y, z);
+                            Gizmos.DrawWireCube(cell + cellOffset, transform.localScale);
+                        }
+                    }
+                }
             }
+        }
+
+        public void OnBeforeSerialize()
+        {
+#if UNITY_EDITOR
+            _serializableHiddenCells = new List<Vector3Int>(HiddenCells);
+#endif
+        }
+
+        public void OnAfterDeserialize()
+        {
+#if UNITY_EDITOR
+            HiddenCells = new HashSet<Vector3Int>(_serializableHiddenCells);
+#endif
         }
     }
 }

@@ -29,11 +29,7 @@ namespace GameplayGridEditor
         private Grid3D _grid;
 
         private HashSet<Vector3Int> _selectedCells = new();
-        private Vector3Int _lastSelectedCell = -Vector3Int.one;
-
-        private HashSet<int> _hiddenX = new();
-        private HashSet<int> _hiddenY = new();
-        private HashSet<int> _hiddenZ = new();
+        private Vector3Int _shiftAnchor = -Vector3Int.one;
 
         private Event _event;
 
@@ -43,34 +39,35 @@ namespace GameplayGridEditor
 
         private SceneView _sceneView;
 
-        [Overlay(defaultDisplay = true, id = "Grid3DToolOverlay")]
+        [Overlay(defaultDisplay = true)]
         class Grid3DToolOverlay : Overlay
         {
             private Grid3DTool  _tool;
             private Grid3D      _grid;
 
-            private bool isLayerVisibilityOpen = false;
-
             public Grid3DToolOverlay(Grid3DTool tool)
             {
                 _tool = tool;
                 _grid = tool._grid;
+                displayName = "Grid3D Editor";
             }
 
             public override VisualElement CreatePanelContent()
             {
                 VisualElement root = new();
-                root.style.maxWidth = 275;
-
-                root.Add(GenerateVisibilityController());
 
                 if (_tool._selectedCells.Count == 0)
-                {
-                    Label noSelectionLabel = new("No cells selected");
-                    root.Add(noSelectionLabel);
-                    return root;
-                }
+                    root.Add(new Label("No cells selected"));
+                else
+                    root.Add(CreateNodeFactoryField());
 
+                root.Add(CreateVisibilityController());
+
+                return root;
+            }
+
+            private ObjectField CreateNodeFactoryField()
+            {
                 Vector3Int someSelectedCell = -Vector3Int.one;
                 foreach (var cell in _tool._selectedCells)
                 {
@@ -111,12 +108,11 @@ namespace GameplayGridEditor
 
                 ObjectField nodeFactoryField = new("Node Factory")
                 {
-                    value           = nodeFactoriesMixed ? null : _grid.TryGetNode(someSelectedCell)?.NodeFactory,
-                    objectType      = typeof(NodeFactory),
-                    showMixedValue  = nodeFactoriesMixed
+                    value = nodeFactoriesMixed ? null : _grid.TryGetNode(someSelectedCell)?.NodeFactory,
+                    objectType = typeof(NodeFactory),
+                    showMixedValue = nodeFactoriesMixed
                 };
 
-                // Set up the callback for when the node factory is changed
                 nodeFactoryField.RegisterValueChangedCallback(evt =>
                 {
                     NodeFactory newFactory = evt.newValue as NodeFactory;
@@ -132,152 +128,58 @@ namespace GameplayGridEditor
                     EditorUtility.SetDirty(_grid);
                 });
 
-                root.Add(nodeFactoryField);
-
-                return root;
+                return nodeFactoryField;
             }
 
-            private Foldout GenerateVisibilityController()
+            private VisualElement CreateVisibilityController()
             {
-                Foldout visibilityController = new() { value = isLayerVisibilityOpen, text = "Layer Visibility" };
-                visibilityController.RegisterValueChangedCallback(evt =>
-                {
-                    isLayerVisibilityOpen = evt.newValue;
-                });
-
-                visibilityController.Add(GenerateAxisVisibilityController(Axis.X));
-                visibilityController.Add(GenerateAxisVisibilityController(Axis.Y));
-                visibilityController.Add(GenerateAxisVisibilityController(Axis.Z));
-
-                return visibilityController;
-            }
-
-            private VisualElement GenerateAxisVisibilityController(Axis axis)
-            {
-                string axisName = axis switch
-                {   Axis.X => "X",
-                    Axis.Y => "Y",
-                    Axis.Z => "Z",
-                    _ => throw new System.ArgumentOutOfRangeException(nameof(axis), axis, null)
-                };
-
-                int axisSize = axis switch
-                {   Axis.X => _grid.Dimensions.x,
-                    Axis.Y => _grid.Dimensions.y,
-                    Axis.Z => _grid.Dimensions.z,
-                    _ => throw new System.ArgumentOutOfRangeException(nameof(axis), axis, null)
-                };
-
-                ref HashSet<int> GetHiddenSet()
-                {
-                    if (axis == Axis.X) return ref _tool._hiddenX;
-                    if (axis == Axis.Y) return ref _tool._hiddenY;
-                    return ref _tool._hiddenZ;
-                }
-                ref HashSet<int> hiddenAxis = ref GetHiddenSet();
-
-                void ClearHiddenSet()
-                {
-                    if (axis == Axis.X)
-                        _tool._hiddenX.Clear();
-                    else if (axis == Axis.Y)
-                        _tool._hiddenY.Clear();
-                    else
-                        _tool._hiddenZ.Clear();
-
-                    _tool.RefreshOverlay();
-                }
-
-                void AddToHiddenSet(int index)
-                {
-                    if (axis == Axis.X)
-                    {
-                        _tool._hiddenX.Add(index);
-                        _tool._selectedCells.RemoveWhere(cell => cell.x == index);
-                    }
-                    else if (axis == Axis.Y)
-                    {
-                        _tool._hiddenY.Add(index);
-                        _tool._selectedCells.RemoveWhere(cell => cell.y == index);
-                    }
-                    else
-                    {
-                        _tool._hiddenZ.Add(index);
-                        _tool._selectedCells.RemoveWhere(cell => cell.z == index);
-                    }
-
-                    _tool.RefreshOverlay();
-                }
-
-                void RemoveFromHiddenSet(int index)
-                {
-                    if (axis == Axis.X)
-                        _tool._hiddenX.Remove(index);
-                    else if (axis == Axis.Y)
-                        _tool._hiddenY.Remove(index);
-                    else
-                        _tool._hiddenZ.Remove(index);
-
-                    _tool.RefreshOverlay();
-                }
-
                 VisualElement container = new();
-                container.style.flexDirection   = FlexDirection.Row;
-                container.style.alignItems      = Align.FlexStart;
-                container.style.height          = 32;
+                container.style.flexDirection = FlexDirection.Row;
+                container.style.justifyContent = Justify.Center;
 
-                Toggle toggleAll = new(axisName)
+                Button hideSelected = new() { text = "Hide selected" };
+                hideSelected.style.flexGrow = 1;
+                hideSelected.clicked += () =>
                 {
-                    value = hiddenAxis.Count == 0
+                    foreach (var cell in _tool._selectedCells)
+                    {
+                        _grid.HiddenCells.Add(cell);
+                    }
+                    _tool._selectedCells.Clear();
+                    _tool.RefreshOverlay();
+                    EditorUtility.SetDirty(_grid);
                 };
-                toggleAll.labelElement.style.minWidth = 0;
-                container.Add(toggleAll);
+                container.Add(hideSelected);
 
-                ScrollView scrollView = new() { mode = ScrollViewMode.Horizontal };
-                scrollView.style.maxWidth = new Length(100, LengthUnit.Percent);
-                for (int i = 0; i < axisSize; i++)
+                Button hideDeselected = new() { text = "Hide deselected" };
+                hideDeselected.style.flexGrow = 1;
+                hideDeselected.clicked += () =>
                 {
-                    int index = i;
-                    Toggle toggle = new(index.ToString())
+                    for (int x = 0; x < _grid.Dimensions.x; x++)
                     {
-                        value = !hiddenAxis.Contains(index)
-                    };
-                    toggle.labelElement.style.minWidth = 0;
-                    toggle.RegisterValueChangedCallback(evt =>
-                    {
-                        if (evt.newValue)
-                            RemoveFromHiddenSet(index);
-                        else
+                        for (int y = 0; y < _grid.Dimensions.y; y++)
                         {
-                            AddToHiddenSet(index);
-                        }
-                    });
-                    scrollView.Add(toggle);
-                }
-                container.Add(scrollView);
+                            for (int z = 0; z < _grid.Dimensions.z; z++)
+                            {
+                                Vector3Int cell = new(x, y, z);
+                                if (_tool._selectedCells.Contains(cell)) continue;
 
-                toggleAll.RegisterValueChangedCallback(evt =>
-                {
-                    foreach (VisualElement child in scrollView.Children())
-                    {
-                        Toggle toggle = child as Toggle;
-
-                        if (toggle != null)
-                        {
-                            toggle.value = evt.newValue;
+                                _grid.HiddenCells.Add(cell);
+                            }
                         }
                     }
+                    EditorUtility.SetDirty(_grid);
+                };
+                container.Add(hideDeselected);
 
-                    if (evt.newValue)
-                        ClearHiddenSet();
-                    else
-                    {
-                        for (int i = 0; i < axisSize; i++)
-                        {
-                            AddToHiddenSet(i);
-                        }
-                    }
-                });
+                Button showAll = new() { text = "Show all" };
+                showAll.style.flexGrow = 1;
+                showAll.clicked += () =>
+                {
+                    _grid.HiddenCells.Clear();
+                    EditorUtility.SetDirty(_grid);
+                };
+                container.Add(showAll);
 
                 return container;
             }
@@ -306,15 +208,13 @@ namespace GameplayGridEditor
             bool wasAnyCellClicked = false;
             for (int x = 0; x < _grid.Dimensions.x; x++)
             {
-                if (_hiddenX.Contains(x)) continue;
                 for (int y = 0; y < _grid.Dimensions.y; y++)
                 {
-                    if (_hiddenY.Contains(y)) continue;
                     for (int z = 0; z < _grid.Dimensions.z; z++)
                     {
-                        if (_hiddenZ.Contains(z)) continue;
-
                         Vector3Int cell = new(x, y, z);
+                        if (_grid.HiddenCells.Contains(cell)) continue;
+
                         Vector3 center = _grid.CellToWorldPosition(cell);
                         if (!IsWorldPointVisible(center, _sceneView)) continue;
 
@@ -367,15 +267,13 @@ namespace GameplayGridEditor
                     List<Vector3Int> newSelection = new();
                     for (int x = 0; x < _grid.Dimensions.x; x++)
                     {
-                        if (_hiddenX.Contains(x)) continue;
                         for (int y = 0; y < _grid.Dimensions.y; y++)
                         {
-                            if (_hiddenY.Contains(y)) continue;
                             for (int z = 0; z < _grid.Dimensions.z; z++)
                             {
-                                if (_hiddenZ.Contains(z)) continue;
-
                                 Vector3Int cell = new(x, y, z);
+                                if (_grid.HiddenCells.Contains(cell)) continue;
+
                                 Vector3 center = _grid.CellToWorldPosition(cell);
 
                                 Vector2 cellGUIPoint = HandleUtility.WorldToGUIPoint(center);
@@ -419,12 +317,10 @@ namespace GameplayGridEditor
 
         private bool HandleCellClick(int controlID, Vector3Int cell)
         {
-            if (_event.shift && _event.control)
+            if (_event.shift && _shiftAnchor != -Vector3Int.one)
             {
-                Vector3Int lastSelected = _lastSelectedCell == -Vector3Int.one ? cell : _lastSelectedCell;
-
-                Vector3Int min = Vector3Int.Min(lastSelected, cell);
-                Vector3Int max = Vector3Int.Max(lastSelected, cell);
+                Vector3Int min = Vector3Int.Min(_shiftAnchor, cell);
+                Vector3Int max = Vector3Int.Max(_shiftAnchor, cell);
 
                 List<Vector3Int> newSelection = new();
                 for (int x = min.x; x <= max.x; x++)
@@ -433,38 +329,14 @@ namespace GameplayGridEditor
                     {
                         for (int z = min.z; z <= max.z; z++)
                         {
-                            newSelection.Add(new(x, y, z));
+                            Vector3Int c = new(x, y, z);
+                            if (_grid.HiddenCells.Contains(cell)) continue;
+
+                            newSelection.Add(c);
                         }
                     }
                 }
-                SelectCells(newSelection, false);
-            }
-            else if (_event.shift)
-            {
-                Vector3Int furthestSelected = cell;
-                foreach (var selected in _selectedCells)
-                {
-                    if (Vector3Int.Distance(selected, cell) > Vector3Int.Distance(furthestSelected, cell))
-                    {
-                        furthestSelected = selected;
-                    }
-                }
-
-                Vector3Int min = Vector3Int.Min(furthestSelected, cell);
-                Vector3Int max = Vector3Int.Max(furthestSelected, cell);
-
-                List<Vector3Int> newSelection = new();
-                for (int x = min.x; x <= max.x; x++)
-                {
-                    for (int y = min.y; y <= max.y; y++)
-                    {
-                        for (int z = min.z; z <= max.z; z++)
-                        {
-                            newSelection.Add(new(x, y, z));
-                        }
-                    }
-                }
-                SelectCells(newSelection, true);
+                SelectCells(newSelection, !_event.control);
             }
             else if (_event.control)
             {
@@ -496,8 +368,9 @@ namespace GameplayGridEditor
             {
                 _selectedCells.Add(cell);
             }
+            
+            _shiftAnchor = cell;
 
-            _lastSelectedCell = cell;
             RefreshOverlay();
         }
 
@@ -516,7 +389,6 @@ namespace GameplayGridEditor
                 }
             }
 
-            _lastSelectedCell = cells.Count > 0 ? cells[^1] : -Vector3Int.one;
             RefreshOverlay();
         }
 
@@ -525,11 +397,12 @@ namespace GameplayGridEditor
             if (_selectedCells.Contains(cell))
             {
                 _selectedCells.Remove(cell);
+                _shiftAnchor = -Vector3Int.one;
             }
             else
             {
                 _selectedCells.Add(cell);
-                _lastSelectedCell = cell;
+                _shiftAnchor = cell;
             }
 
             RefreshOverlay();
@@ -538,7 +411,7 @@ namespace GameplayGridEditor
         private void ClearSelectedCells()
         {
             _selectedCells.Clear();
-            _lastSelectedCell = -Vector3Int.one;
+            _shiftAnchor = -Vector3Int.one;
             RefreshOverlay();
         }
 

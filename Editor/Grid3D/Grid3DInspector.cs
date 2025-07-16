@@ -4,6 +4,7 @@ using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 using GameplayGrid;
 using UnityEditor.EditorTools;
+using UnityEditor.Overlays;
 
 namespace GameplayGridEditor
 {
@@ -29,6 +30,12 @@ namespace GameplayGridEditor
 
                 _grid.SetDimensions(clampedValue);
                 EditorUtility.SetDirty(_grid);
+                
+                if (SceneView.lastActiveSceneView.TryGetOverlay("Grid3DToolOverlay", out Overlay overlay) && overlay.displayed)
+                {
+                    overlay.displayed = false;
+                    overlay.displayed = true;
+                }
             });
             dimensionsField.AddToClassList("unity-base-field__aligned");
             root.Add(dimensionsField);

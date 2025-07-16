@@ -43,7 +43,7 @@ namespace GameplayGridEditor
 
         private SceneView _sceneView;
 
-        [Overlay(defaultDisplay = true)]
+        [Overlay(defaultDisplay = true, id = "Grid3DToolOverlay")]
         class Grid3DToolOverlay : Overlay
         {
             private Grid3DTool  _tool;
@@ -60,7 +60,7 @@ namespace GameplayGridEditor
             public override VisualElement CreatePanelContent()
             {
                 VisualElement root = new();
-                root.style.minWidth = 250;
+                root.style.maxWidth = 275;
 
                 root.Add(GenerateVisibilityController());
 
@@ -222,9 +222,9 @@ namespace GameplayGridEditor
                 }
 
                 VisualElement container = new();
-                container.style.flexDirection = FlexDirection.Row;
-                container.style.alignItems = Align.FlexStart;
-                container.style.height = 32;
+                container.style.flexDirection   = FlexDirection.Row;
+                container.style.alignItems      = Align.FlexStart;
+                container.style.height          = 32;
 
                 Toggle toggleAll = new(axisName)
                 {
@@ -234,11 +234,11 @@ namespace GameplayGridEditor
                 container.Add(toggleAll);
 
                 ScrollView scrollView = new() { mode = ScrollViewMode.Horizontal };
-                scrollView.style.maxWidth = 200;
+                scrollView.style.maxWidth = new Length(100, LengthUnit.Percent);
                 for (int i = 0; i < axisSize; i++)
                 {
                     int index = i;
-                    Toggle toggle = new($"{index}")
+                    Toggle toggle = new(index.ToString())
                     {
                         value = !hiddenAxis.Contains(index)
                     };
@@ -479,7 +479,7 @@ namespace GameplayGridEditor
             return true;
         }
 
-        private void RefreshOverlay()
+        public void RefreshOverlay()
         {
             _overlay.displayed = false;
             _overlay.displayed = true;

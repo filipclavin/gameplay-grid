@@ -1,4 +1,5 @@
 using GameplayGrid;
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.EditorTools;
@@ -6,6 +7,7 @@ using UnityEditor.Overlays;
 using UnityEditor.ShortcutManagement;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.UIElements;
 
 namespace GameplayGridEditor
@@ -44,8 +46,10 @@ namespace GameplayGridEditor
         [Overlay(defaultDisplay = true)]
         class Grid3DToolOverlay : Overlay
         {
-            private Grid3DTool          _tool;
-            private Grid3D              _grid;
+            private Grid3DTool  _tool;
+            private Grid3D      _grid;
+
+            private bool isLayerVisibilityOpen = false;
 
             public Grid3DToolOverlay(Grid3DTool tool)
             {
@@ -56,9 +60,14 @@ namespace GameplayGridEditor
             public override VisualElement CreatePanelContent()
             {
                 VisualElement root = new();
+                root.style.minWidth = 250;
+
+                root.Add(GenerateVisibilityController());
 
                 if (_tool._selectedCells.Count == 0)
                 {
+                    Label noSelectionLabel = new("No cells selected");
+                    root.Add(noSelectionLabel);
                     return root;
                 }
 
@@ -126,6 +135,151 @@ namespace GameplayGridEditor
                 root.Add(nodeFactoryField);
 
                 return root;
+            }
+
+            private Foldout GenerateVisibilityController()
+            {
+                Foldout visibilityController = new() { value = isLayerVisibilityOpen, text = "Layer Visibility" };
+                visibilityController.RegisterValueChangedCallback(evt =>
+                {
+                    isLayerVisibilityOpen = evt.newValue;
+                });
+
+                visibilityController.Add(GenerateAxisVisibilityController(Axis.X));
+                visibilityController.Add(GenerateAxisVisibilityController(Axis.Y));
+                visibilityController.Add(GenerateAxisVisibilityController(Axis.Z));
+
+                return visibilityController;
+            }
+
+            private VisualElement GenerateAxisVisibilityController(Axis axis)
+            {
+                string axisName = axis switch
+                {   Axis.X => "X",
+                    Axis.Y => "Y",
+                    Axis.Z => "Z",
+                    _ => throw new System.ArgumentOutOfRangeException(nameof(axis), axis, null)
+                };
+
+                int axisSize = axis switch
+                {   Axis.X => _grid.Dimensions.x,
+                    Axis.Y => _grid.Dimensions.y,
+                    Axis.Z => _grid.Dimensions.z,
+                    _ => throw new System.ArgumentOutOfRangeException(nameof(axis), axis, null)
+                };
+
+                ref HashSet<int> GetHiddenSet()
+                {
+                    if (axis == Axis.X) return ref _tool._hiddenX;
+                    if (axis == Axis.Y) return ref _tool._hiddenY;
+                    return ref _tool._hiddenZ;
+                }
+                ref HashSet<int> hiddenAxis = ref GetHiddenSet();
+
+                void ClearHiddenSet()
+                {
+                    if (axis == Axis.X)
+                        _tool._hiddenX.Clear();
+                    else if (axis == Axis.Y)
+                        _tool._hiddenY.Clear();
+                    else
+                        _tool._hiddenZ.Clear();
+
+                    _tool.RefreshOverlay();
+                }
+
+                void AddToHiddenSet(int index)
+                {
+                    if (axis == Axis.X)
+                    {
+                        _tool._hiddenX.Add(index);
+                        _tool._selectedCells.RemoveWhere(cell => cell.x == index);
+                    }
+                    else if (axis == Axis.Y)
+                    {
+                        _tool._hiddenY.Add(index);
+                        _tool._selectedCells.RemoveWhere(cell => cell.y == index);
+                    }
+                    else
+                    {
+                        _tool._hiddenZ.Add(index);
+                        _tool._selectedCells.RemoveWhere(cell => cell.z == index);
+                    }
+
+                    _tool.RefreshOverlay();
+                }
+
+                void RemoveFromHiddenSet(int index)
+                {
+                    if (axis == Axis.X)
+                        _tool._hiddenX.Remove(index);
+                    else if (axis == Axis.Y)
+                        _tool._hiddenY.Remove(index);
+                    else
+                        _tool._hiddenZ.Remove(index);
+
+                    _tool.RefreshOverlay();
+                }
+
+                VisualElement container = new();
+                container.style.flexDirection = FlexDirection.Row;
+                container.style.alignItems = Align.FlexStart;
+                container.style.height = 32;
+
+                Toggle toggleAll = new(axisName)
+                {
+                    value = hiddenAxis.Count == 0
+                };
+                toggleAll.labelElement.style.minWidth = 0;
+                container.Add(toggleAll);
+
+                ScrollView scrollView = new() { mode = ScrollViewMode.Horizontal };
+                scrollView.style.maxWidth = 200;
+                for (int i = 0; i < axisSize; i++)
+                {
+                    int index = i;
+                    Toggle toggle = new($"{index}")
+                    {
+                        value = !hiddenAxis.Contains(index)
+                    };
+                    toggle.labelElement.style.minWidth = 0;
+                    toggle.RegisterValueChangedCallback(evt =>
+                    {
+                        if (evt.newValue)
+                            RemoveFromHiddenSet(index);
+                        else
+                        {
+                            AddToHiddenSet(index);
+                        }
+                    });
+                    scrollView.Add(toggle);
+                }
+                container.Add(scrollView);
+
+                toggleAll.RegisterValueChangedCallback(evt =>
+                {
+                    foreach (VisualElement child in scrollView.Children())
+                    {
+                        Toggle toggle = child as Toggle;
+
+                        if (toggle != null)
+                        {
+                            toggle.value = evt.newValue;
+                        }
+                    }
+
+                    if (evt.newValue)
+                        ClearHiddenSet();
+                    else
+                    {
+                        for (int i = 0; i < axisSize; i++)
+                        {
+                            AddToHiddenSet(i);
+                        }
+                    }
+                });
+
+                return container;
             }
         }
 
@@ -325,7 +479,7 @@ namespace GameplayGridEditor
             return true;
         }
 
-        private void OnCellSelectionUpdated()
+        private void RefreshOverlay()
         {
             _overlay.displayed = false;
             _overlay.displayed = true;
@@ -344,7 +498,7 @@ namespace GameplayGridEditor
             }
 
             _lastSelectedCell = cell;
-            OnCellSelectionUpdated();
+            RefreshOverlay();
         }
 
         private void SelectCells(List<Vector3Int> cells, bool clearPreviousSelection)
@@ -363,7 +517,7 @@ namespace GameplayGridEditor
             }
 
             _lastSelectedCell = cells.Count > 0 ? cells[^1] : -Vector3Int.one;
-            OnCellSelectionUpdated();
+            RefreshOverlay();
         }
 
         private void ToggleCell(Vector3Int cell)
@@ -378,14 +532,14 @@ namespace GameplayGridEditor
                 _lastSelectedCell = cell;
             }
 
-            OnCellSelectionUpdated();
+            RefreshOverlay();
         }
 
         private void ClearSelectedCells()
         {
             _selectedCells.Clear();
             _lastSelectedCell = -Vector3Int.one;
-            OnCellSelectionUpdated();
+            RefreshOverlay();
         }
 
         private static bool IsWorldPointVisible(Vector3 worldPos, SceneView sceneView)
